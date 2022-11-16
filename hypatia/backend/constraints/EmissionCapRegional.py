@@ -26,7 +26,7 @@ class EmissionCapRegional(Constraint):
                     (len(self.model_data.settings.years) * len(self.model_data.settings.time_steps), 1)
                 )
                 for key, value in self.variables.emission_by_region[reg][emission_type].items():
-                    regional_emission += cp.sum(value, axis=1)
+                    regional_emission = regional_emission + cp.sum(value, axis=1)
                 emission_cap = self.model_data.regional_parameters[reg]["emission_cap_annual"][
                     "{} Global Cap".format(emission_type)
                 ].values
@@ -53,7 +53,7 @@ class EmissionCapRegional(Constraint):
                                 ]["Carrier_out"]
                                 .values
                             ):
-                                emission_power += self.variables.emission_by_region[reg][emission_type][key][:,indx]
+                                emission_power = emission_power + self.variables.emission_by_region[reg][emission_type][key][:,indx]
                 emission_power_cap = self.model_data.regional_parameters[reg]["emission_cap_annual_power"][
                     "{} Power Cap".format(emission_type)
                 ].values

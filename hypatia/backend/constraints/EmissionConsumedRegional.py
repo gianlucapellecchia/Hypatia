@@ -30,10 +30,10 @@ class EmissionConsumedRegional(Constraint):
                     (len(self.model_data.settings.years), 1)
                 ) 
                 for key, value in self.variables.captured_emission_by_region[reg][emission_type].items():
-                    regional_emission_captured += cp.sum(value, axis=1)
+                    regional_emission_captured = regional_emission_captured + cp.sum(value, axis=1)
                     
                 for key, value in self.variables.used_emissions_by_region[reg][emission_type].items():
-                    regional_emission_consumed += cp.sum(value, axis=1)
+                    regional_emission_consumed = regional_emission_consumed + cp.sum(value, axis=1)
                     
                 rules.append(regional_emission_captured - regional_emission_consumed >= 0)
                 

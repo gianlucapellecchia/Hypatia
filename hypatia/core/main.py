@@ -17,6 +17,7 @@ from hypatia.utility.excel import (
     read_parameters,
 )
 from hypatia.utility.constants import ModelMode
+from hypatia.utility.constants import ModelOptimization
 from hypatia.backend.Build import BuildModel
 from copy import deepcopy
 from hypatia.postprocessing.PostProcessingList import POSTPROCESSING_MODULES
@@ -41,7 +42,7 @@ class Model:
     A Hypatia Model
     """
 
-    def __init__(self, path, mode, name="unknown"):
+    def __init__(self, path, mode, optimization, name="unknown"):
         
         print("\n ------------------- NEW RUN ------------------- \n")
 
@@ -61,15 +62,23 @@ class Model:
                 * 'Planning'
                 * 'Operation'
 
+        optimization : str
+            Defines the optimization of the model. Acceptable values are :
+
+                * 'Single'
+                * 'Close2optimal'
+
         name : str (Optional)
             Defines the name of the model.
         """
 
         assert mode in ["Planning", "Operation"], "Invalid Operation"
+        assert optimization in ["Single", "Close2optimal"], "Invalid Operation"
         model_mode = ModelMode.Planning if mode == "Planning" else ModelMode.Operation
+        model_optimization = ModelOptimization.Single if optimization == "Single" else ModelOptimization.Close2optimal
         self.results = None
         self.backup_results = None
-        self.__settings = read_settings(path=path, mode=model_mode)
+        self.__settings = read_settings(path=path, mode=model_mode, optimization=model_optimization)
         self.__model_data = None
         self.name = name
 
@@ -172,10 +181,12 @@ class Model:
 
         model = BuildModel(model_data=self.__model_data)
 
-        results = model._solve(verbosity=verbosity, solver=solver.upper(), **kwargs)
+        results, optimal_value = model._solve(verbosity=verbosity, solver=solver.upper(), **kwargs)
         self.check = results
         if results is not None:
             self.results = results
+
+        return optimal_value
 
     def to_csv(self, path, postprocessing_module="default", force_rewrite=False):
         """Exports the results of the model to csv files with nested folders

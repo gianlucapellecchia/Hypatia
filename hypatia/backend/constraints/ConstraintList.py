@@ -18,8 +18,9 @@ from hypatia.backend.constraints.LineAvailability import LineAvailability
 from hypatia.backend.constraints.LineNewCapacity import LineNewCapacity
 from hypatia.backend.constraints.ProductionRamping import ProductionRamping
 from hypatia.backend.constraints.PumpHydroProd import PumpHydroProd
-from hypatia.backend.constraints.RenewableProductionRegional import RenewableProductionRegional 
-from hypatia.backend.constraints.ElectrolysisConsumption import ElectrolysisConsumption
+from hypatia.backend.constraints.RenewableProductionRegional import RenewableProductionRegional
+from hypatia.backend.constraints.Close2optimalCost import Close2optimalCost 
+# from hypatia.backend.constraints.ElectrolysisConsumption import ElectrolysisConsumption
 # from hypatia.backend.constraints.TechnologyUseShareRegional import TechnologyUseShareRegional
 
 CONSTRAINTS = [
@@ -44,6 +45,33 @@ CONSTRAINTS = [
     ProductionRamping,
     PumpHydroProd,
     RenewableProductionRegional,
-    ElectrolysisConsumption
+    # ElectrolysisConsumption
+    # TechnologyUseShareRegional
+]
+
+CLOSE2OPTCONSTRAINTS = [
+    Balance,
+    TradeBalance,
+    ResourceTechAvailability,
+    TotalCapacityRegional,
+    NewCapacityRegional,
+    TechEfficency,
+    AnnualProductionRegional,
+    EmissionCapRegional,
+    EmissionCapGlobal,
+    EmissionConsumedRegional,
+    StorageMaxMinChange,
+    StorageMaxFlowInOut,
+    LineTotalCapacity,
+    TotalCapacityGlobal,
+    NewCapacityGlobal,
+    AnnualProductionGlobal,
+    LineAvailability,
+    LineNewCapacity,
+    ProductionRamping,
+    PumpHydroProd,
+    RenewableProductionRegional,
+    Close2optimalCost,
+    # ElectrolysisConsumption
     # TechnologyUseShareRegional
 ]

@@ -9,6 +9,7 @@ from typing import (
     Optional
 )
 from hypatia.utility.constants import (
+    ModelOptimization,
     global_set_ids,
     regional_set_ids,
     ModelMode,
@@ -43,6 +44,9 @@ class ModelSettings:
     mode:
         The mode of optimization including the operation and planning mode
 
+    optimization:
+        The mode of optimization including single optimal solution or close to optimal solutions
+
     global_settings : dict
         A dictionary of the global set tables given by the user in the global.xlsx file
 
@@ -54,10 +58,12 @@ class ModelSettings:
     def __init__(
         self,
         mode: ModelMode,
+        optimization: ModelOptimization,
         global_settings: Dict[str, pd.DataFrame],
         regional_settings: Dict[str, Dict[str, pd.DataFrame]],
     ):
         self.mode = mode
+        self.optimization = optimization
         self.global_settings = global_settings
         self.regional_settings = regional_settings
         self._validate_global_settings()
@@ -436,6 +442,12 @@ class ModelSettings:
                     "value": 0, # cp.Parameter(), #(len(self.years), len(specific_emission_indexer)),value = np.zeros((len(self.years), len(specific_emission_indexer)))), #shape=(len(self.years), len(specific_emission_indexer.columns)),
                     "index": pd.Index(self.years, name="Years"),
                     "columns": specific_emission_indexer,
+                },
+                "specific_land_usage": {
+                    "sheet_name": "Specific_land_usage",
+                    "value": 0,
+                    "index": pd.Index(self.years, name="Years"),
+                    "columns": indexer_reg,
                 },
                 "emission_filter_efficiency": {
                     "sheet_name": "Emission_filter_efficiency",
