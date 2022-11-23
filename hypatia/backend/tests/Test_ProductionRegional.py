@@ -72,10 +72,10 @@ class TestProductionSingleRegionOperation(unittest.TestCase):
         regional_parameters["reg1"]["carrier_ratio_out"].loc[:, (['CHP'], ["Heat"])] -= 0.6
 
         # Imposing a maximum production 
-        regional_parameters["reg1"]["tech_max_production"].loc[:, (slice(None), ["PV_park"])] -= 1e20
-        regional_parameters["reg1"]["tech_max_production"].loc[:, (slice(None), ["PV_park"])] += 4000
-        regional_parameters["reg1"]["Conv_plus_max_production"].loc[:, (['CHP'], ["Elec"])] -= 1e20
-        regional_parameters["reg1"]["Conv_plus_max_production"].loc[:, (['CHP'], ["Elec"])] += 4000
+        # regional_parameters["reg1"]["tech_max_production"].loc[:, (slice(None), ["PV_park"])] -= 1e20
+        # regional_parameters["reg1"]["tech_max_production"].loc[:, (slice(None), ["PV_park"])] += 4000
+        # regional_parameters["reg1"]["Conv_plus_max_production"].loc[:, (['CHP'], ["Elec"])] -= 1e20
+        # regional_parameters["reg1"]["Conv_plus_max_production"].loc[:, (['CHP'], ["Elec"])] += 4000
 
 
         model_data = ModelData(

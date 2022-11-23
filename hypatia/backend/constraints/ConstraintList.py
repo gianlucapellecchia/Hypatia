@@ -43,7 +43,9 @@ CONSTRAINTS = [
     LineNewCapacity,
     ProductionRamping,
     PumpHydroProd,
-    RenewableProductionRegional,
-    ElectrolysisConsumption
+    # RenewableProductionRegional,
+    # ElectrolysisConsumption
     # TechnologyUseShareRegional
 ]
+
+

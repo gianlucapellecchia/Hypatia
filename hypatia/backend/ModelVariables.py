@@ -23,6 +23,7 @@ class ModelVariables():
         self._balance_()
         if self.model_data.settings.mode == ModelMode.Planning:
             self._calc_variable_planning()
+
             if self.model_data.settings.multi_node:
                 self._calc_variable_planning_line()
 
@@ -33,8 +34,10 @@ class ModelVariables():
         
         self._calc_variable_storage_SOC()
         self._calc_emission_variables()
-        self._calc_actualized_cost()
-        self._calc_actualized_emission()
+        
+        if self.model_data.settings.mode == ModelMode.Planning:
+            self._calc_actualized_cost()
+            self._calc_actualized_emission()
 
         # Reshape the demand
         self.demand = {
@@ -756,7 +759,7 @@ class ModelVariables():
                         axis=1,
                     )
 
-                    if ctgry != "Transmission" and ctgry != "Storage":
+                    if ctgry != "Transmission" and ctgry != "Storage" and ctgry != "Demand":
                         for emission_type in get_emission_types(self.model_data.settings.global_settings):
                             
                             totalcost_regional += cp.sum(

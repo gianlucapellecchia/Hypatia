@@ -1,16 +1,11 @@
 from hypatia.backend.constraints.Constraint import Constraint
-from hypatia.utility.constants import (
-    ModelMode,
-    TopologyType
-)
 from hypatia.utility.utility import create_technology_columns
 import pandas as pd
 import cvxpy as cp
-import numpy as np
 
 """
-Defines the annual upper and lower limit on the total capacity
-of each technology within each region
+Defines the annual upper and lower limit production variation 
+between two consecutive timesteps of each technology within each region
 """
 class ProductionRamping(Constraint):
     # it runs on both operation and planning, single- and multi-region

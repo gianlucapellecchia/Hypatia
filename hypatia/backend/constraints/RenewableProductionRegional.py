@@ -11,7 +11,7 @@ import cvxpy as cp
 import numpy as np
 
 """
-Defines lower limit for the annual electric production from renewable energy technologies
+Defines lower limit for the annual energy and electric production from renewable energy technologies
 """
 class RenewableProductionRegional(Constraint):
     
@@ -22,7 +22,6 @@ class RenewableProductionRegional(Constraint):
     def __electicity_production_calc(self):
         
         totalprodelec_annual = {}
-        # totalprodelec_annual_regional = []
         for reg in self.model_data.settings.regions:
             
             for carr,value in self.variables.totalprodbycarrier[reg].items():
@@ -82,7 +81,6 @@ class RenewableProductionRegional(Constraint):
                 totalprod.append(totalprod_annual_sector)
 
             totalprod_annual_regional = cp.vstack(totalprod)
-            # print(totalprod_annual_regional)
 
             totalprod_annual[reg] = totalprod_annual_regional
     
@@ -96,7 +94,6 @@ class RenewableProductionRegional(Constraint):
             
             techprodelec_annual_regional = {}
             transmission_efficiency = self.model_data.regional_parameters[reg]["tech_efficiency"]["Transmission"]["Elec_transmission_distribution"].values
-            # print(transmission_efficiency)
                     
             for key in self.model_data.settings.technologies[reg].keys():
                 
@@ -105,7 +102,6 @@ class RenewableProductionRegional(Constraint):
                     for indx, tech in enumerate(self.model_data.settings.technologies[reg][key]):
                         
                         if self.model_data.regional_parameters[reg]["renewable_tech"][(key,tech)].values == 1:
-                            # print(self.model_data.regional_parameters[reg]["renewable_tech"][(key,tech)].values)
                             
                             for carr,value in self.variables.totalprodbycarrier[reg].items():
                                 
@@ -222,12 +218,9 @@ class RenewableProductionRegional(Constraint):
         totalprodelec_annual = self.__electicity_production_calc()
         totalprod_annual = self.__energy_production_calc()
         renewable_elec_prod = self.__renewable_electicity_production_calc()
-        # print(renewable_elec_prod)
         renewable_prod = self.__renewable_production_calc()
-        # print(renewable_prod)
         
         for reg in self.model_data.settings.regions: 
-            # print(np.shape(totalprodelec_annual[reg]))
 
             renewable_elec_prod_annual = sum(renewable_elec_prod[reg].values())
             renewable_prod_annual = sum(renewable_prod[reg].values())

@@ -1,17 +1,10 @@
 from hypatia.backend.constraints.Constraint import Constraint
-from hypatia.utility.constants import (
-    ModelMode,
-    TopologyType
-)
-from hypatia.utility.utility import annual_activity
-from hypatia.utility.utility import create_technology_columns
-from hypatia.utility.utility import stack
-import pandas as pd
 import cvxpy as cp
-import numpy as np
 
 """
-Defines lower limit for the annual electric production from renewable energy technologies
+Ensure that the Electrolysis can produced only if the the electricity produced 
+from renewable energy source technologies is equal or higher than the electricity consumed by the Electrolysis itself
+In this way we are trying to ensure Electrolysis produces green hydrogen 
 """
 class ElectrolysisConsumption(Constraint):
     
@@ -102,19 +95,21 @@ class ElectrolysisConsumption(Constraint):
                     
                     if tech != "Electrolysis":
                         continue
+                    
+                    else:
                         
-                    techuse_annual = []
-                                                    
-                    for year in range(0, len(self.model_data.settings.years)):
-                                                            
-                        usetech_annual = cp.sum(
-                            self.variables.technology_use[reg][key][:,indx][(year) * len(self.model_data.settings.time_steps) : (year+1) * len(self.model_data.settings.time_steps)],
-                            axis=0,
-                            keepdims=True,
-                        )
-                        techuse_annual.append(usetech_annual)
-                        
-                    electrolysis_use_annual_regional = cp.vstack(techuse_annual)
+                        techuse_annual = []
+                                                        
+                        for year in range(0, len(self.model_data.settings.years)):
+                                                                
+                            usetech_annual = cp.sum(
+                                self.variables.technology_use[reg][key][:,indx][(year) * len(self.model_data.settings.time_steps) : (year+1) * len(self.model_data.settings.time_steps)],
+                                axis=0,
+                                keepdims=True,
+                            )
+                            techuse_annual.append(usetech_annual)
+                            
+                        electrolysis_use_annual_regional = cp.vstack(techuse_annual)
             
             rules.append(
                 electrolysis_use_annual_regional -
