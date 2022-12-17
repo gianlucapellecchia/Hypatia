@@ -1,16 +1,11 @@
 from hypatia.backend.constraints.Constraint import Constraint
-from hypatia.utility.constants import (
-    ModelMode,
-    TopologyType
-)
 from hypatia.utility.utility import create_technology_columns
 import pandas as pd
 import cvxpy as cp
-import numpy as np
 
 """
-Defines the annual upper and lower limit on the total capacity
-of each technology within each region
+Defines the annual upper and lower limit production variation 
+between two consecutive timesteps of each technology within each region
 """
 class ProductionRamping(Constraint):
     # it runs on both operation and planning, single- and multi-region
@@ -58,7 +53,7 @@ class ProductionRamping(Constraint):
 
         for reg in self.model_data.settings.regions:
             for tech_type in self.model_data.settings.technologies[reg].keys():
-                if tech_type == "Demand" or tech_type == "Transmission" or tech_type == "Storage":
+                if tech_type == "Demand" or tech_type == "Transmission":
                     continue
                 max_percentage_ramps = self.model_data.regional_parameters[reg]["prod_max_ramp"].loc[:, tech_type]
                 max_percentage_ramps = max_percentage_ramps.reindex(max_percentage_ramps.index.repeat(

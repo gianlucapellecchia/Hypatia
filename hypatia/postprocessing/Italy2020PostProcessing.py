@@ -46,7 +46,9 @@ class Italy2020PostProcessing(PostProcessingInterface):
             "total_capacity": self.total_capacity(),
             "new_capacity": self.new_capacity(),
             "real_new_capacity": self.real_new_capacity(),
-            "storage_SOC": self.state_of_charge()
+            "storage_SOC": self.state_of_charge(),
+            # "line_import": self.line_import(),
+            # "line_export": self.line_export(),
         }
 
 
@@ -141,7 +143,115 @@ class Italy2020PostProcessing(PostProcessingInterface):
                     else:
                         result = pd.concat([result, res])
         return result.reset_index()[["Year", "Timesteps", "Region", "Technology", "Carrier", "Value"]]
+        
+    # def line_carrier(self):
+    #     years = self._settings.years
+    #     time_fraction = self._settings.time_steps
+    #     year_slice = Italy2020PostProcessing.year_slice_index(years, time_fraction)
+    #     line_carriers = {}
+    #     for region in self._settings.regions:
+    #         carrier_out = self._settings.regional_settings[region]["Carriers"]["Carrier"]
+    #         line_carriers[region] = {}
+    #         for regions in self._settings.regions:
+    #             if regions == region:
+    #                 continue
+    #             line_carriers[region][regions] = carrier_out
+        
+    #     print(line_carriers)
 
+    #     return line_carriers
+    
+    def line_export(self):
+        years = self._settings.years
+        time_steps = self._settings.time_steps
+        year_to_year_name = {
+            row.Year:row.Year_name for _, row in self._settings.global_settings["Years"].iterrows()
+        }
+        time_fractions = {
+            row.Timeslice:row.Timeslice_fraction for _, row in self._settings.global_settings["Timesteps"].iterrows()
+        }
+
+        year_slice = Italy2020PostProcessing.year_slice_index(years, time_steps)
+        results = self._model_results
+
+        # reg1, reg2, year, timeslice, carrier_out, prod
+        result = None
+        for region in self._settings.regions:
+            for regions in self._settings.regions:
+                if(regions == region):
+                    continue
+                columns = self._settings.regional_settings[region]["Carriers"]["Carrier"]
+                res = pd.DataFrame(
+                    data=results.line_export[region][regions].value,
+                    index=year_slice,
+                    columns=columns,
+                )
+                
+                # res = self.line_carrier()[region][regions].mul(frame[regions].values, axis='index')
+                res = pd.concat({regions: res}, names=['To reg'])
+                res = pd.concat({region: res}, names=['From reg'])
+                res["Year"] = res.apply(
+                    lambda row: datetime.strptime(str(year_to_year_name[row.name[2]]), '%Y').strftime("%Y") ,
+                    # + timedelta(minutes=(525600  * time_fractions[int(row.name[3])] * (int(row.name[3]) - 1))),
+                    axis=1
+                )
+                res = res.reset_index()
+                res = res.melt(
+                    id_vars=['Year', 'Years', 'Timesteps', 'From reg', 'To reg'],
+                    var_name="Carrier",
+                    value_name="Value",
+                )
+                if result is None:
+                    result = res
+                else:
+                    result = pd.concat([result, res])
+        return result.reset_index()[["Year", "Timesteps", "From reg", "To reg", "Carrier", "Value"]]
+
+    def line_import(self):
+        years = self._settings.years
+        time_steps = self._settings.time_steps
+        year_to_year_name = {
+            row.Year:row.Year_name for _, row in self._settings.global_settings["Years"].iterrows()
+        }
+        time_fractions = {
+            row.Timeslice:row.Timeslice_fraction for _, row in self._settings.global_settings["Timesteps"].iterrows()
+        }
+
+        year_slice = Italy2020PostProcessing.year_slice_index(years, time_steps)
+        results = self._model_results
+
+        # reg1, reg2, year, timeslice, carrier_out, prod
+        result = None
+        for region in self._settings.regions:
+            for regions in self._settings.regions:
+                if(regions == region):
+                    continue
+                columns = self._settings.regional_settings[region]["Carriers"]["Carrier"]
+                res = pd.DataFrame(
+                    data=results.line_import[region][regions].value,
+                    index=year_slice,
+                    columns=columns,
+                )
+                
+                # res = self.line_carrier()[region][regions].mul(frame[regions].values, axis='index')
+                res = pd.concat({regions: res}, names=['From reg'])
+                res = pd.concat({region: res}, names=['To reg'])
+                res["Year"] = res.apply(
+                    lambda row: datetime.strptime(str(year_to_year_name[row.name[2]]), '%Y').strftime("%Y") ,
+                    # + timedelta(minutes=(525600  * time_fractions[int(row.name[3])] * (int(row.name[3]) - 1))),
+                    axis=1
+                )
+                res = res.reset_index()
+                res = res.melt(
+                    id_vars=['Year', 'Years', 'Timesteps', 'To reg', 'From reg'],
+                    var_name="Carrier",
+                    value_name="Value",
+                )
+                if result is None:
+                    result = res
+                else:
+                    result = pd.concat([result, res])
+        return result.reset_index()[["Year", "Timesteps", "To reg", "From reg", "Carrier", "Value"]]
 
     def tech_carrier_in_production(self):
         years = self._settings.years
@@ -417,9 +527,15 @@ class Italy2020PostProcessing(PostProcessingInterface):
             for tech_type, techs in results.totalcapacity[region].items():
                 if(tech_type == "Demand"):
                     continue
+                if isinstance(results.totalcapacity[region][tech_type], np.ndarray):
+                    totcap = results.totalcapacity[region][tech_type]
+                elif isinstance(results.totalcapacity[region][tech_type], (pd.DataFrame, pd.Series)):
+                    totcap = results.totalcapacity[region][tech_type].values
+                else:
+                    totcap = results.totalcapacity[region][tech_type].value
                 columns = self._settings.technologies[region][tech_type]
                 res = pd.DataFrame(
-                    data=results.totalcapacity[region][tech_type].value,
+                    data=totcap,
                     index=pd.Index(
                         years, name="Year"
                     ),
@@ -552,7 +668,7 @@ def write_processed_result(postprocessed_result: Dict, path: str):
             write_processed_result(value, new_path)
 
 def italy2020_merge_results(scenarios: Dict[str, str], path: str, force_rewrite: bool = False):
-    result_df_names = ["tech_production", "tech_use", "storage_SOC", "tech_cost", "emissions", "captured_emissions", "total_capacity", "new_capacity", "real_new_capacity", "actualized_total_cost", "actualized_emission"]
+    result_df_names = ["tech_production", "tech_use", "tech_cost", "emissions", "captured_emissions", "total_capacity", "new_capacity", "real_new_capacity", "actualized_total_cost", "actualized_emission", "storage_SOC"] #"line_import", "line_export",
     results = {}
     for result_df_name in result_df_names:
         results[result_df_name] = None

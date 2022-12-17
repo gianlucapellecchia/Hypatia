@@ -9,7 +9,8 @@ import numpy as np
 import cvxpy as cp
 
 """
-Defines the CO2 emission cap within each region
+Defines the CO2 emission cap within each region for all the sectors
+Defines the CO2 emission cap within each region for power sector only (electricity production) 
 """
 class EmissionCapRegional(Constraint):
     def _check(self):

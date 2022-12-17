@@ -23,6 +23,7 @@ class ModelVariables():
         self._balance_()
         if self.model_data.settings.mode == ModelMode.Planning:
             self._calc_variable_planning()
+
             if self.model_data.settings.multi_node:
                 self._calc_variable_planning_line()
 
@@ -33,8 +34,10 @@ class ModelVariables():
         
         self._calc_variable_storage_SOC()
         self._calc_emission_variables()
-        self._calc_actualized_cost()
-        self._calc_actualized_emission()
+        
+        if self.model_data.settings.mode == ModelMode.Planning:
+            self._calc_actualized_cost()
+            self._calc_actualized_emission()
 
         # Reshape the demand
         self.demand = {
@@ -703,20 +706,6 @@ class ModelVariables():
         self.captured_emission_by_type = self.flip_keys(self.captured_emission_by_region)
         self.emission_cost_by_type = self.flip_keys(self.emission_cost_by_region)
         self.used_emissions_by_type = self.flip_keys(self.used_emissions_by_region)
-        
-        
-    # emissions_regional[emission_type][key] = cp.multiply(
-    #     self.production_annual[reg][key],
-    #     cp.multiply(self.model_data.regional_parameters[reg]["specific_emission"][emission_type].loc[:, key],
-    #     (np.ones((self.model_data.regional_parameters[reg]["emission_filter_efficiency"][emission_type].loc[:, key].shape[0],self.model_data.regional_parameters[reg]["emission_filter_efficiency"][emission_type].loc[:, key].shape[1]))
-    #       -self.model_data.regional_parameters[reg]["emission_filter_efficiency"][emission_type].loc[:, key]))
-    # )
-    
-    # total_captured_emissions_regional[emission_type][key] = cp.multiply(
-    #     self.production_annual[reg][key],
-    #     cp.multiply(self.model_data.regional_parameters[reg]["specific_emission"][emission_type].loc[:, key],
-    #     self.model_data.regional_parameters[reg]["emission_filter_efficiency"][emission_type].loc[:, key])
-    # )
 
 
     def flip_keys(self, d):
@@ -756,7 +745,7 @@ class ModelVariables():
                         axis=1,
                     )
 
-                    if ctgry != "Transmission" and ctgry != "Storage":
+                    if ctgry != "Transmission" and ctgry != "Storage" and ctgry != "Demand":
                         for emission_type in get_emission_types(self.model_data.settings.global_settings):
                             
                             totalcost_regional += cp.sum(

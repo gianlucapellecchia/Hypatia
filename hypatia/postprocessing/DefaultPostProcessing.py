@@ -48,8 +48,8 @@ RESULT_MAP = {
     "lines_fix_cost": {"index": "years", "var": "results.cost_fix_line"},
     "lines_variable_cost": {"index": "years", "var": "results.cost_variable_line"},
     "lines_decomisioning_cost": {"index": "years", "var": "results.cost_decom_line"},
-    "actualized_total_cost": {"index": "years", "var": "results.totalcost_allregions_act"},
-    "actualized_emission": {"index": "years", "var": "results.totalemission_bytype_act"}
+    # "actualized_total_cost": {"index": "years", "var": "results.totalcost_allregions_act"},
+    # "actualized_emission": {"index": "years", "var": "results.totalemission_bytype_act"}
 }
 
 def get_result_map(glob_mapping):
@@ -98,7 +98,7 @@ class DefaultPostProcessing(PostProcessingInterface):
             except (KeyError, AttributeError):
                 continue
 
-            if var == None:
+            if var == None: 
                 continue
 
             vars_frames[item] = {}
