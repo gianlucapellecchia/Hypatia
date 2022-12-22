@@ -706,20 +706,6 @@ class ModelVariables():
         self.captured_emission_by_type = self.flip_keys(self.captured_emission_by_region)
         self.emission_cost_by_type = self.flip_keys(self.emission_cost_by_region)
         self.used_emissions_by_type = self.flip_keys(self.used_emissions_by_region)
-        
-        
-    # emissions_regional[emission_type][key] = cp.multiply(
-    #     self.production_annual[reg][key],
-    #     cp.multiply(self.model_data.regional_parameters[reg]["specific_emission"][emission_type].loc[:, key],
-    #     (np.ones((self.model_data.regional_parameters[reg]["emission_filter_efficiency"][emission_type].loc[:, key].shape[0],self.model_data.regional_parameters[reg]["emission_filter_efficiency"][emission_type].loc[:, key].shape[1]))
-    #       -self.model_data.regional_parameters[reg]["emission_filter_efficiency"][emission_type].loc[:, key]))
-    # )
-    
-    # total_captured_emissions_regional[emission_type][key] = cp.multiply(
-    #     self.production_annual[reg][key],
-    #     cp.multiply(self.model_data.regional_parameters[reg]["specific_emission"][emission_type].loc[:, key],
-    #     self.model_data.regional_parameters[reg]["emission_filter_efficiency"][emission_type].loc[:, key])
-    # )
 
 
     def flip_keys(self, d):

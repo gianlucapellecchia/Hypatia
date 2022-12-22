@@ -35,21 +35,30 @@ class Italy2020PostProcessing(PostProcessingInterface):
             )
 
     def process_results(self) -> Dict:
-        return {
-            "tech_production": self.tech_carrier_out_production(),
-            "tech_use": self.tech_carrier_in_production(),
-            "tech_cost": self.tech_cost(),
-            # "actualized_total_cost": self.actualized_cost(),
-            "emissions": self.emission(),
-            "captured_emissions": self.emissions_captured(),
-            # "actualized_emission": self.actualized_emissions(),
-            "total_capacity": self.total_capacity(),
-            # "new_capacity": self.new_capacity(),
-            # "real_new_capacity": self.real_new_capacity(),
-            # "storage_SOC": self.state_of_charge(),
-            "line_import": self.line_import(),
-            "line_export": self.line_export(),
-        }
+        if self._settings.mode == ModelMode.Operation:
+            return {
+                "tech_production": self.tech_carrier_out_production(),
+                "tech_use": self.tech_carrier_in_production(),
+                "tech_cost": self.tech_cost(),
+                "emissions": self.emission(),
+                "captured_emissions": self.emissions_captured(),
+                "total_capacity": self.total_capacity(),
+                "line_import": self.line_import(),
+                "line_export": self.line_export(),
+            }
+        elif self._settings.mode == ModelMode.Planning:
+            return {
+                "tech_production": self.tech_carrier_out_production(),
+                "tech_use": self.tech_carrier_in_production(),
+                "tech_cost": self.tech_cost(),
+                "emissions": self.emission(),
+                "captured_emissions": self.emissions_captured(),
+                "total_capacity": self.total_capacity(),
+                "new_capacity": self.new_capacity(),
+                "real_new_capacity": self.real_new_capacity(),
+                "line_import": self.line_import(),
+                "line_export": self.line_export(),
+            }
 
 
     def tech_to_carrier_out(self):
@@ -144,22 +153,6 @@ class Italy2020PostProcessing(PostProcessingInterface):
                         result = pd.concat([result, res])
         return result.reset_index()[["Year", "Timesteps", "Region", "Technology", "Carrier", "Value"]]
         
-    # def line_carrier(self):
-    #     years = self._settings.years
-    #     time_fraction = self._settings.time_steps
-    #     year_slice = Italy2020PostProcessing.year_slice_index(years, time_fraction)
-    #     line_carriers = {}
-    #     for region in self._settings.regions:
-    #         carrier_out = self._settings.regional_settings[region]["Carriers"]["Carrier"]
-    #         line_carriers[region] = {}
-    #         for regions in self._settings.regions:
-    #             if regions == region:
-    #                 continue
-    #             line_carriers[region][regions] = carrier_out
-        
-    #     print(line_carriers)
-
-    #     return line_carriers
     
     def line_export(self):
         years = self._settings.years
