@@ -93,7 +93,7 @@ class RenewableProductionRegional(Constraint):
         for reg in self.model_data.settings.regions:        
             
             techprodelec_annual_regional = {}
-            transmission_efficiency = self.model_data.regional_parameters[reg]["tech_efficiency"]["Transmission"]["Elec_transmission_distribution"].values
+            # transmission_efficiency = self.model_data.regional_parameters[reg]["tech_efficiency"]["Transmission"]["Elec_transmission_distribution"].values
                     
             for key in self.model_data.settings.technologies[reg].keys():
                 
@@ -134,9 +134,9 @@ class RenewableProductionRegional(Constraint):
                                             techprodelec_annual_conv.append(techprodelec_annual_rest) 
                                             
                                         techprodelec_conv = cp.vstack(techprodelec_annual_conv)
-                                        transmission_efficiency.shape = techprodelec_conv.shape
+                                        # transmission_efficiency.shape = techprodelec_conv.shape
                                             
-                                        techprodelec_annual_regional[tech] = cp.multiply(techprodelec_conv,transmission_efficiency)
+                                        techprodelec_annual_regional[tech] = techprodelec_conv
 
                                     else: 
                                         
@@ -152,9 +152,9 @@ class RenewableProductionRegional(Constraint):
                                             techprodelec_annual_other.append(othertechprodelec_annual_rest) 
                                             
                                         techprodelec_annual = cp.vstack(techprodelec_annual_other)
-                                        transmission_efficiency.shape = techprodelec_annual.shape
+                                        # transmission_efficiency.shape = techprodelec_annual.shape
                                             
-                                        techprodelec_annual_regional[tech] = cp.multiply(techprodelec_annual,transmission_efficiency)
+                                        techprodelec_annual_regional[tech] = techprodelec_annual
 
             renewable_elec_prod[reg] = techprodelec_annual_regional
         return renewable_elec_prod
