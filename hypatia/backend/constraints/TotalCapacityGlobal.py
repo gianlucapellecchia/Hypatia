@@ -37,7 +37,7 @@ class TotalCapacityGlobal(Constraint):
                 <= 0
             )
 
-        return rules
+        return rules 
 
     def _required_global_parameters(settings):
         return {

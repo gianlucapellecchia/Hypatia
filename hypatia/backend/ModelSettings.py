@@ -437,6 +437,12 @@ class ModelSettings:
                     "index": pd.Index(self.years, name="Years"),
                     "columns": specific_emission_indexer,
                 },
+                "specific_land_usage": {
+                    "sheet_name": "Specific_land_usage",
+                    "value": 0,
+                    "index": pd.Index(self.years, name="Years"),
+                    "columns": indexer_reg,
+                },
                 "emission_filter_efficiency": {
                     "sheet_name": "Emission_filter_efficiency",
                     "value": 0,

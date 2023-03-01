@@ -10,6 +10,7 @@ import numpy as np
 from plotly import graph_objs as go
 from plotly.subplots import make_subplots
 import plotly.offline as pltly
+import plotly.graph_objects as go
 from IPython import get_ipython
 from hypatia.analysis.postprocessing import year_slice_index
 
@@ -85,6 +86,8 @@ def plot(kind, **properties):
         fig = go.Scatter(**properties)
 
         return fig
+    elif kind == "pie":
+        return go.Pie(**properties)
     else:
         raise ValueError(f"{kind} is not an acceptable kind.")
 
@@ -162,22 +165,27 @@ class Plotter:
 
         self._read_config_file(config)
         self._hourly = hourly_resolution
-
+        
     def _init_from_object(self, results):
         """Extracts the data for plots"""
 
         self.data = deepcopy(results.results)
         self.regions = deepcopy(results.get_model_data().settings.regions)
         self.years = deepcopy(results.get_model_data().settings.years)
+        self.time_steps = deepcopy(results.get_model_data().settings.time_steps)
         self.time_fraction = deepcopy(results.get_model_data().settings.timeslice_fraction)
         self.techs = deepcopy(
             results.get_model_data().settings.global_settings["Technologies_glob"]["Technology"].tolist()
         )
+        # self.regionalsettings = deepcopy(results.get_model_data().settings.regional_settings)
         self.fuels = deepcopy(
             results.get_model_data().settings.global_settings["Carriers_glob"]["Carrier"].tolist()
         )
         self.emissions = deepcopy(
             results.get_model_data().settings.global_settings["Emissions"]["Emission"].tolist()
+        )
+        self.mode = deepcopy(
+            results.get_model_data().settings.mode
         )
 
         reformed_sets = {}
@@ -206,21 +214,6 @@ class Plotter:
         time_fraction = results.get_model_data().settings.time_steps
         year_slice = year_slice_index(years, time_fraction)
 
-        for item in ["tech_residual_cap", "carrier_ratio_in", "carrier_ratio_out"]:
-
-            self.data[item] = {}
-            for reg in self.regions:
-                if item not in results.get_model_data().regional_parameters[reg]:
-                    continue
-                if item == "tech_residual_cap":
-                    index = years
-                else:
-                    index = year_slice
-                data = results.get_model_data().regional_parameters[reg][item]
-                self.data[item][reg] = pd.DataFrame(
-                    data=data.values, index=index, columns=data.columns
-                )
-
     def _init_from_csv(self, results):
         """Extracts the data from csv files"""
         raise NotImplementedError("Not implemented in this version")
@@ -232,7 +225,7 @@ class Plotter:
     def _read_config_file(self, config):
         """Reads the config file and checks the consistency"""
         configs = {}
-        for sheet in ["Techs", "Fuels", "Regions", "Emissions"]:
+        for sheet in ["Techs", "Importexport", "Fuels", "Regions", "Emissions"]:
             data = pd.read_excel(io=config, sheet_name=sheet, index_col=0, header=0,)
 
             if data.isnull().values.any():
@@ -285,14 +278,20 @@ class Plotter:
             the mode of plot when more than one region exists in
 
         """
+        
+        indexer_time = pd.MultiIndex.from_product(
+            [self.years, self.time_steps],
+            names=["Years", "Timesteps"],
+        )
+        
         if regions == "all":
             regions = self.regions
 
         fuels = self.configs["fuels"]
         fuels = fuels[fuels["fuel_group"].isin(str2ls(fuel_group))].index
-
+        
         if not len(fuels):
-            raise ValueError("No fuel found for given category .")
+            raise ValueError("No fuel found for given fuel name .")
         unit = self._take_units("fuels", fuels, "fuel_unit")
         fig = go.Figure()
         counter = []
@@ -316,10 +315,10 @@ class Plotter:
                 legends = set()
             if "Demand" in tech_type:
                 for tt, values in (
-                    self.data["demand"][region]
+                    self.data.demand[region]
                     .groupby(level=0, sort=False)
                     .sum()
-                    .iteritems()
+                    .items()
                 ):
                     if tt not in carrier_tech:
                         continue
@@ -338,17 +337,30 @@ class Plotter:
                         ),
                     )
 
-                    legends.add(tt)
-            for category, df in self.data["use_by_tech"][region].items():
+                    legends.add(tt)                 
+            
+            techuse = self.data.technology_use[region]
+
+            for category, df in techuse.items():
+
+                all_columns = self.mapping[region]["Technologies"].loc[self.mapping[region]["Technologies"]["Tech_category"]==category]["Technology"].values
+                columns = self.mapping[region]["Technologies"].loc[self.mapping[region]["Technologies"]["Tech_category"]==category]
+                columns = columns[columns.Technology.isin(carrier_tech)]["Technology"].to_list()
+                
+                if columns != []:
+                    tech_use = pd.DataFrame(df.value, indexer_time, all_columns)
+                    techuse = tech_use.filter(items=columns,axis=1)
+                else:
+                    continue
 
                 if category == "Conversion":
-                    for tt, values in df.groupby(level=0, sort=False).sum().iteritems():
-
+                    
+                    for tt, values in techuse.groupby(level=0, sort=False).sum().items():
                         if tt not in carrier_tech:
                             continue
                         name = self.configs["techs"].loc[tt, "tech_name"]
                         color = self.configs["techs"].loc[tt, "tech_color"]
-
+                        
                         fig.add_trace(
                             plot(
                                 kind=kind,
@@ -364,16 +376,16 @@ class Plotter:
                         legends.add(tt)
                 if category == "Conversion_plus":
 
-                    for tt, values in df.iteritems():
+                    for tt, values in techuse.groupby(level=0, sort=False).sum().items():
 
                         if tt not in carrier_tech:
                             continue
 
-                        ratio = self.data["carrier_ratio_in"][region].loc[
+                        ratio = self.data.carrier_ratio_in[region].loc[
                             :, (tt, slice(None))
                         ]
 
-                        for cols, ratios in ratio.iteritems():
+                        for cols, ratios in ratio.items():
                             if cols[1] in fuels:
 
                                 name = self.configs["techs"].loc[tt, "tech_name"]
@@ -443,7 +455,7 @@ class Plotter:
             defines the model of plots in case multiple restions are given
         """
 
-        self._is_allowed("new_capacity")
+        # self._is_allowed("real_new_capacity")
 
         if regions == "all":
             regions = self.regions
@@ -463,13 +475,16 @@ class Plotter:
             if not aggregate:
                 legends = set()
             for tt in tech_type.unique():
-                if tt not in self.data["new_capacity"][region]:
+                if tt not in self.data.real_new_capacity[region]:
                     continue
-                to_plot = self.data["new_capacity"][region][tt]
+                newcap = self.data.real_new_capacity[region][tt]
+                residual = self.data.residual_capacity[region][tt]
+                newcap = pd.DataFrame(newcap.value, residual.index, residual.columns)
 
                 if cummulative:
-                    to_plot = to_plot.cumsum()
-                for t, values in to_plot.iteritems():
+                    newcap = newcap.cumsum()
+                    
+                for t, values in residual.items():
                     if t not in techs:
                         continue
                     name = self.configs["techs"].loc[t, "tech_name"]
@@ -480,7 +495,7 @@ class Plotter:
                             kind=kind,
                             name=name,
                             x=values.index,
-                            y=values.values,
+                            y=newcap[t],
                             marker_color=color,
                             visible=visible(step_index, aggregate),
                             showlegend=False if t in legends else True,
@@ -557,63 +572,22 @@ class Plotter:
             if not aggregate:
                 legends = set()
             for tt in tech_type.unique():
-                if tt not in self.data["total_capacity"][region]:
+                if tt not in self.data.totalcapacity[region]:
                     continue
-                to_plot = self.data["total_capacity"][region][tt]
-                residual = self.data["tech_residual_cap"][region][tt]
-
-                to_plot = to_plot - residual
-
-                for t, values in to_plot.iteritems():
-                    if t not in techs:
-                        continue
-                    name = self.configs["techs"].loc[t, "tech_name"]
-                    color = self.configs["techs"].loc[t, "tech_color"]
-
-                    name = f"{name}: residual capacity"
-
-                    fig.add_trace(
-                        plot(
-                            kind=kind,
-                            name=name,
-                            x=values.index,
-                            y=residual[t],
-                            marker_color=color,
-                            opacity=0.3,
-                            visible=visible(step_index, aggregate),
-                            showlegend=False if t in legends else True,
-                        )
-                    )
-
-                    legends.add(name)
-                for t, values in to_plot.iteritems():
-                    if t not in techs:
-                        continue
-                    name = self.configs["techs"].loc[t, "tech_name"]
-                    color = self.configs["techs"].loc[t, "tech_color"]
-
-                    name = f"{name}: new capacity"
-
-                    fig.add_trace(
-                        plot(
-                            kind=kind,
-                            name=name,
-                            x=values.index,
-                            y=values.values,
-                            marker_color=color,
-                            visible=visible(step_index, aggregate),
-                            showlegend=False if name in legends else True,
-                        )
-                    )
-
-                    legends.add(name)
-                if decom_cap:
-                    to_plot = self.data["decommissioned_capacity"][region][tt].cumsum()
-                    residul_decom = residual.iloc[0, :] - residual
-
-                    for t, values in to_plot.iteritems():
+                
+                residual = self.data.residual_capacity[region][tt]
+                
+                if self.mode == "Planning":
+                    
+                    totcap = self.data.totalcapacity[region][tt]
+                    totcap = pd.DataFrame(totcap.value, residual.index, residual.columns)
+                    
+                    to_plot = totcap - residual
+                    
+                    for t, values in residual.items():
                         if t not in techs:
                             continue
+
                         name = self.configs["techs"].loc[t, "tech_name"]
                         color = self.configs["techs"].loc[t, "tech_color"]
 
@@ -624,16 +598,20 @@ class Plotter:
                                 kind=kind,
                                 name=name,
                                 x=values.index,
-                                y=-residul_decom[t],
+                                y=residual[t],
                                 marker_color=color,
                                 opacity=0.3,
                                 visible=visible(step_index, aggregate),
-                                showlegend=False if name in legends else True,
+                                showlegend=False if t in legends else True,
                             )
                         )
-                    for t, values in to_plot.iteritems():
+
+                        legends.add(name)
+                        
+                    for t, values in residual.items():
                         if t not in techs:
                             continue
+                        
                         name = self.configs["techs"].loc[t, "tech_name"]
                         color = self.configs["techs"].loc[t, "tech_color"]
 
@@ -644,23 +622,109 @@ class Plotter:
                                 kind=kind,
                                 name=name,
                                 x=values.index,
-                                y=-values.values,
+                                y=to_plot[t],
                                 marker_color=color,
-                                opacity=0.5,
                                 visible=visible(step_index, aggregate),
                                 showlegend=False if name in legends else True,
                             )
                         )
 
-                        legends.add(t)
+                        legends.add(name)
+                    if decom_cap:
+                        to_plot = self.data.decommissioned_capacity[region][tt].cumsum()
+                        residul_decom = residual.iloc[0, :] - residual
+
+                        for t, values in to_plot.items():
+                            if t not in techs:
+                                continue
+                            name = self.configs["techs"].loc[t, "tech_name"]
+                            color = self.configs["techs"].loc[t, "tech_color"]
+
+                            name = f"{name}: residual capacity"
+
+                            fig.add_trace(
+                                plot(
+                                    kind=kind,
+                                    name=name,
+                                    x=values.index,
+                                    y=-residul_decom[t],
+                                    marker_color=color,
+                                    opacity=0.3,
+                                    visible=visible(step_index, aggregate),
+                                    showlegend=False if name in legends else True,
+                                )
+                            )
+                        for t, values in to_plot.items():
+                            if t not in techs:
+                                continue
+                            name = self.configs["techs"].loc[t, "tech_name"]
+                            color = self.configs["techs"].loc[t, "tech_color"]
+
+                            name = f"{name}: new capacity"
+
+                            fig.add_trace(
+                                plot(
+                                    kind=kind,
+                                    name=name,
+                                    x=values.index,
+                                    y=-values.values,
+                                    marker_color=color,
+                                    opacity=0.5,
+                                    visible=visible(step_index, aggregate),
+                                    showlegend=False if name in legends else True,
+                                )
+                            )
+
+                            legends.add(t)
+                else:
+                    totcap = residual
+                    totcap = pd.DataFrame(totcap.values, residual.index, residual.columns)
+                    
+                    to_plot = totcap
+                    # xx = []
+                    for t, values in to_plot.items():
+                        if t not in techs:
+                            continue
+                        x = []
+                        name = self.configs["techs"].loc[t, "tech_name"]
+                        color = self.configs["techs"].loc[t, "tech_color"]
+
+                        name = f"{name}"
+                        x.append(name)
+                        # xx.append(name)
+                        fig.add_trace(
+                            plot(
+                                kind=kind,
+                                name=name,
+                                x= x,
+                                y=to_plot[t],
+                                marker_color=color,
+                                visible=visible(step_index, aggregate),
+                                showlegend=False if name in legends else True,
+                            )
+                        )
+
+                        legends.add(name)
+
+                
             counter.append(
                 (self.configs["regions"].loc[region, "region_name"], len(fig.data))
             )
-        layout = {
-            "title": "Total Capacity",
-            "yaxis": {"title": unit},
-            "xaxis": dict(tickmode="array", tickvals=values.index, dtick=1),
-        }
+            
+        # print(xx)
+        
+        if self.mode == "Planning":
+            layout = {
+                "title": "Total Capacity",
+                "yaxis": {"title": unit},
+                "xaxis": dict(tickmode="array", tickvals=values.index, dtick=1),
+            }
+        else:
+            layout = {
+                "title": "Total Capacity",
+                "yaxis": {"title": unit},
+                "xaxis": dict(tickmode="array", dtick=1),
+            }
         if not aggregate:
             fig = set_steps(fig, counter, mode)
         if kind == "bar":
@@ -713,15 +777,20 @@ class Plotter:
             if not aggregate:
                 legends = set()
             for tt in tech_type.unique():
-                if tt not in self.data["production_by_tech"][region]:
+                if tt not in self.data.technology_prod[region]:
                     continue
-                to_plot = (
-                    self.data["production_by_tech"][region][tt]
-                    .groupby(level=0, sort=False)
-                    .sum()
+                techprod = self.data.technology_prod[region][tt]                
+                columns = self.mapping[region]["Technologies"].loc[self.mapping[region]["Technologies"]["Tech_category"]==tt]["Technology"].values
+                
+                indexer_time = pd.MultiIndex.from_product(
+                    [self.years, self.time_steps],
+                    names=["Years", "Timesteps"],
                 )
-
-                for t, values in to_plot.iteritems():
+ 
+                techprod = pd.DataFrame(techprod.value, indexer_time, columns)
+                techprod = techprod.groupby(level=0, sort=False).sum()
+                
+                for t, values in techprod.items():
                     if t not in techs:
                         continue
                     name = self.configs["techs"].loc[t, "tech_name"]
@@ -732,7 +801,7 @@ class Plotter:
                             kind=kind,
                             name=name,
                             x=values.index,
-                            y=values.values,
+                            y=techprod[t],
                             marker_color=color,
                             visible=visible(step_index, aggregate),
                             showlegend=False if t in legends else True,
@@ -743,6 +812,7 @@ class Plotter:
             counter.append(
                 (self.configs["regions"].loc[region, "region_name"], len(fig.data))
             )
+        
         layout = {
             "title": "Production by technology",
             "yaxis": {"title": unit},
@@ -781,6 +851,12 @@ class Plotter:
         trade : boolean
             if True, imports and exports will be considered in production & consumption
         """
+        
+        indexer_time = pd.MultiIndex.from_product(
+            [self.years, self.time_steps],
+            names=["Years", "Timesteps"],
+        )
+        
         aggregate = False
         fuels = self.configs["fuels"]
         fuels = fuels[fuels["fuel_group"].isin(str2ls(fuel_group))].index
@@ -828,38 +904,36 @@ class Plotter:
             colors = []
             production = pd.Series(dtype="float64")
 
-            for category, df in self.data["production_by_tech"][region].items():
-
+            for category, df in self.data.technology_prod[region].items():
                 if category in ["Transmission", "Storage"]:
                     continue
+                
                 sliced_techs = get_data(
                     self.sets[region]["Technologies"].loc[category, "Technology"]
                 )
-
+                df = pd.DataFrame(df.value, indexer_time, sliced_techs)
                 techs_plt = [i for i in prod_techs if i in sliced_techs]
+                techs_plt = list(set(techs_plt))
 
                 if category == "Conversion_plus":
                     _df = pd.Series(dtype="float64")
-                    for tt, values in df.loc[years, techs_plt].iteritems():
-
+                    for tt, values in df.loc[years, techs_plt].items():
                         activity = values
 
-                        ratio = self.data["carrier_ratio_out"][region].loc[
+                        ratio = self.data.carrier_ratio_out[region].loc[
                             (years, slice(None)), (tt, slice(None))
                         ]
 
                         res = 0
-                        for cols, ratios in ratio.iteritems():
+                        for cols, ratios in ratio.items():
+
                             if cols[1] in fuels:
                                 res += (activity * ratios).sum().sum()
                         _df.loc[tt] = res
+
                 else:
-                    _df = (
-                        df.groupby(level=0, sort=False)
-                        .sum()
-                        .loc[years, techs_plt]
-                        .sum()
-                    )
+                    _df = df.filter(items=techs_plt,axis=1).groupby(level=0, sort=False).sum().loc[years, techs_plt].sum()
+
                 production = production.append(_df)
 
                 labels.extend(
@@ -870,7 +944,7 @@ class Plotter:
                 )
 
                 if (trade) and ("imports" in self.data):
-                    for key, value in self.data["imports"][region].items():
+                    for key, value in self.data.imports[region].items():
                         imports = (
                             value.groupby(level=0, sort=False)
                             .sum()
@@ -910,10 +984,10 @@ class Plotter:
 
             if "Demand" in tech_type:
                 for tt, values in (
-                    self.data["demand"][region]
+                    self.data.demand[region]
                     .groupby(level=0, sort=False)
                     .sum()
-                    .iteritems()
+                    .items()
                 ):
                     if tt not in carrier_tech:
                         continue
@@ -935,17 +1009,16 @@ class Plotter:
                         "export to " + self.configs["regions"].loc[key, "region_name"]
                     )
                     colors.append(self.configs["regions"].loc[key, "region_color"])
-            for category, df in self.data["use_by_tech"][region].items():
-
+            for category, df in self.data.technology_use[region].items():
+                if category in ["Transmission", "Storage"]:
+                    continue
+                
+                columns = self.mapping[region]["Technologies"].loc[self.mapping[region]["Technologies"]["Tech_category"]==category]["Technology"].values
+                df = pd.DataFrame(df.value, indexer_time, columns)
+                
                 if category == "Conversion":
-                    for tt, values in (
-                        df.groupby(level=0, sort=False)
-                        .sum()
-                        .loc[years, :]
-                        .sum()
-                        .iteritems()
-                    ):
-
+                    df = df.groupby(level=0, sort=False).sum().loc[years, :].sum()
+                    for tt, values in df.items():
                         if tt not in carrier_tech:
                             continue
                         labels.append(self.configs["techs"].loc[tt, "tech_name"])
@@ -953,7 +1026,7 @@ class Plotter:
                         consumption.loc[tt] = values
                 elif category == "Conversion_plus":
 
-                    for tt, values in df.loc[years, :].iteritems():
+                    for tt, values in df.loc[years, :].items():
 
                         if tt not in carrier_tech:
                             continue
@@ -961,15 +1034,16 @@ class Plotter:
                         colors.append(self.configs["techs"].loc[tt, "tech_color"])
 
                         activity = values
-                        ratio = self.data["carrier_ratio_in"][region].loc[
+                        ratio = self.data.carrier_ratio_in[region].loc[
                             (years, slice(None)), (tt, slice(None))
                         ]
-
+           
                         res = 0
-                        for cols, ratios in ratio.iteritems():
+                        for cols, ratios in ratio.items():
                             if cols[1] in fuels:
                                 res += (activity * ratios).sum()
                         consumption.loc[tt] = res
+          
             fig.add_trace(
                 go.Pie(
                     values=consumption.values,
@@ -995,6 +1069,7 @@ class Plotter:
         self,
         path,
         tech_group,
+        emission_type,
         regions="all",
         kind="bar",
         mode="updatemenus",
@@ -1012,17 +1087,24 @@ class Plotter:
         regions : list[str]
             Which regions to plot
         kind : str, optional
-            Type of the plot can be area or bar. The default is "area".
+            Type of the plot can be area or bar. The default is "bar".
         mode : str, optional
             defined the mode when multiple regions are plotted. Acceptable values are "updatemenus" and "sliders". The default is "updatemenus".
         aggregate : boolean, optional
             If True will aggregated the regions into one singel region. The default is False.
         """
+        
+        indexer_time = pd.MultiIndex.from_product(
+            [self.years, self.time_steps],
+            names=["Years", "Timesteps"],
+        )
+        
         techs = self.configs["techs"]
-        techs = techs[techs["tech_group"].isin(str2ls(tech_group))].index
-        unit = self.configs["emissions"].loc[self.emissions[0], "emission_unit"]
-        emission_name = self.configs["emissions"].loc[self.emissions[0], "emission_name"]
-
+        techs = list(techs[techs["tech_group"].isin(str2ls(tech_group))].index)
+        
+        emission_name = self.configs["emissions"]
+        emission_name = emission_name[emission_name["emission_name"].isin(str2ls(emission_type))].index
+        unit = list(self.configs["emissions"].loc[emission_name, "emission_unit"])
 
         if regions == "all":
             regions = self.regions
@@ -1034,45 +1116,54 @@ class Plotter:
 
         if aggregate:
             legends = set()
-        for step_index, region in enumerate(regions):
+        for step_index, types in enumerate(emission_name):
             if not aggregate:
                 legends = set()
-            for df in self.data["emissions"][region].values():
-                for t, values in df.iteritems():
-                    if t not in techs:
-                        continue
-                    name = self.configs["techs"].loc[t, "tech_name"]
-                    color = self.configs["techs"].loc[t, "tech_color"]
-
-                    fig.add_trace(
-                        plot(
-                            kind=kind,
-                            name=name,
-                            x=values.index,
-                            y=values.values,
-                            marker_color=color,
-                            visible=visible(step_index, aggregate),
-                            showlegend=False if t in legends else True,
+            for step_index_reg, region in enumerate(regions):
+                for category, df in self.data.emission_by_type[types][region].items():
+                    columns = self.mapping[region]["Technologies"].loc[self.mapping[region]["Technologies"]["Tech_category"]==category]["Technology"].values
+                    to_plot = pd.DataFrame(df.value, self.years, columns)
+                    for t, values in to_plot.items():
+                        if t not in techs:
+                            continue
+                        name = self.configs["techs"].loc[t, "tech_name"]
+                        color = self.configs["techs"].loc[t, "tech_color"]
+    
+                        fig.add_trace(
+                            plot(
+                                kind=kind,
+                                name=name,
+                                x=values.index,
+                                y=to_plot[t],
+                                marker_color=color,
+                                visible=visible(step_index, aggregate),
+                                showlegend=True,
+                            )
                         )
-                    )
-                    legends.add(t)
-            counter.append(
-                (self.configs["regions"].loc[region, "region_name"], len(fig.data))
-            )
-        layout = {
-            "title": emission_name,
-            "xaxis": dict(tickmode="array", tickvals=values.index, dtick=1),
-            "yaxis_title": unit,
-        }
+                        
+                        legends.add(t)
 
-        if not aggregate:
-            fig = set_steps(fig, counter, mode)
-        _plotter(fig=fig, layout=layout, path=path)
+                counter.append(
+                    (self.configs["regions"].loc[region, "region_name"], len(fig.data))
+                )
+                
+            layout = {
+                "title": types,
+                "xaxis": dict(tickmode="array", tickvals=values.index, dtick=1),
+                "yaxis_title": unit[step_index],
+            }
+    
+            if not aggregate:
+                fig = set_steps(fig, counter, mode)
+            if kind == "bar":
+                layout["barmode"] = "relative"
+            _plotter(fig=fig, layout=layout, path=path)
 
     def plot_hourly_prod_by_tech(
         self,
         path,
         tech_group,
+        fuel_group,
         year,
         regions="all",
         kind="area",
@@ -1112,6 +1203,11 @@ class Plotter:
             If True will aggregated the regions into one singel region. The default is False.
 
         """
+        
+        indexer_time = pd.MultiIndex.from_product(
+            [self.years, self.time_steps],
+            names=["Years", "Timesteps"],
+        )
 
         if not self._hourly:
             raise Exception("Is only applicapable with hourly resolution")
@@ -1137,39 +1233,93 @@ class Plotter:
         for step_index, region in enumerate(regions):
             if not aggregate:
                 legends = set()
+            
+            to_plots_trade = []   
+            for regions in self.configs["regions"].index:
+                if(regions == region):
+                    continue
+                
+                fuel = self.configs["fuels"]
+                fuel = fuel[fuel["fuel_group"].isin(str2ls(fuel_group))].index
+                
+                columns = self.glob_mapping["fuels"]["Carr_name"].index
+                imports = self.data.line_import[region][regions]
+                imports = pd.DataFrame(imports.value, index = indexer_time, columns = columns)
 
-            # add if there are some storages consumption
+                imports = pd.DataFrame(imports[fuel].values, 
+                                       index = indexer_time, 
+                                       columns = ["Import to " + region + " from " + regions]*len(fuel))
+
+                to_plots_trade.append(
+                    imports.loc[year]
+                )
+                  
+            for regions in self.configs["regions"].index:
+                if(regions == region):
+                    continue
+                
+                fuel = self.configs["fuels"]
+                fuel = fuel[fuel["fuel_group"].isin(str2ls(fuel_group))].index
+                
+                columns = self.glob_mapping["fuels"]["Carr_name"].index
+                exports = self.data.line_export[region][regions]
+                exports = pd.DataFrame(exports.value, index = indexer_time, columns = columns)
+
+                exports = pd.DataFrame(exports[fuel].values,
+                                       index = indexer_time, 
+                                       columns = ["Export from " + region + " to " + regions]*len(fuel))
+
+                to_plots_trade.append(
+                    -exports.loc[year]
+                )            
+                
             to_plots = []
+            # add if there are some storages consumption
             for tt in tech_type.unique():
 
-                if tt not in self.data["production_by_tech"][region]:
+                if tt not in self.data.technology_prod[region]:
                     continue
+                
+                techprod = self.data.technology_prod[region][tt]                
+                columns = self.mapping[region]["Technologies"].loc[self.mapping[region]["Technologies"]["Tech_category"]==tt]["Technology"].values
 
+                techprod = pd.DataFrame(techprod.value, indexer_time, columns)   
                 to_plots.append(
-                    self.data["production_by_tech"][region][tt].loc[year].copy()
+                    techprod.loc[year]
                 )
 
                 if tt == "Storage":
+                    
+                    storage = self.data.technology_use[region][tt]                
+                    columns = self.mapping[region]["Technologies"].loc[self.mapping[region]["Technologies"]["Tech_category"]==tt]["Technology"].values
+                    
+                    indexer_time = pd.MultiIndex.from_product(
+                        [self.years, self.time_steps],
+                        names=["Years", "Timesteps"],
+                    )
+     
+                    storage = pd.DataFrame(storage.value, indexer_time, columns)
                     to_plots.append(
-                        -self.data["use_by_tech"][region][tt].loc[year].copy()
+                        -storage.loc[year]
                     )
 
             for to_plot in to_plots:
 
+
                 # To avoid leap years,
                 time_index = pd.date_range(
-                    start="2011-01-01", periods=len(to_plot), freq="1h"
+                    start="2021-01-01", periods=len(to_plot), freq="1h"
                 )
 
                 to_plot.index = time_index
-
+                
                 try:
-                    to_plot = to_plot.loc[f"2011 {start}":f"2011 {end}"]
+                    to_plot = to_plot.loc[f"2021 {start}":f"2021 {end}"]
                 except:
                     raise ValueError("incorrect start or end.")
 
                 try:
-                    yy = int(year) - 2011
+                    yy = int(year) - 2021
                     to_plot.index = to_plot.index + pd.offsets.DateOffset(years=yy)
                 except:
                     pass
@@ -1177,7 +1327,7 @@ class Plotter:
                 to_plot = to_plot.resample(freq)
                 to_plot = eval(f"to_plot.{function}()")
 
-                for t, values in to_plot.iteritems():
+                for t, values in to_plot.items():
                     if t not in techs:
                         continue
                     name = self.configs["techs"].loc[t, "tech_name"]
@@ -1196,15 +1346,64 @@ class Plotter:
                     )
 
                     legends.add(t)
+                    
+            for to_plot_trade in to_plots_trade:
+                # print(to_plot)
+
+                # To avoid leap years,
+                time_index = pd.date_range(
+                    start="2021-01-01", periods=len(to_plot_trade), freq="1h"
+                )
+
+                to_plot_trade.index = time_index
+                
+                try:
+                    to_plot_trade = to_plot_trade.loc[f"2021 {start}":f"2021 {end}"]
+                except:
+                    raise ValueError("incorrect start or end.")
+
+                try:
+                    yy = int(year) - 2021
+                    to_plot_trade.index = to_plot_trade.index + pd.offsets.DateOffset(years=yy)
+                except:
+                    pass
+
+                to_plot_trade = to_plot_trade.resample(freq)
+                to_plot_trade = eval(f"to_plot_trade.{function}()")
+
+                for tt, values in to_plot_trade.items():
+
+                    name = self.configs["importexport"].loc[tt, "line_name"]
+                    color = self.configs["importexport"].loc[tt, "line_color"]
+
+                    fig.add_trace(
+                        plot(
+                            kind=kind,
+                            name=name,
+                            x=values.index,
+                            y=values.values,
+                            marker_color=color,
+                            visible=visible(step_index, aggregate),
+                            showlegend=False if tt in legends else True,
+                        )
+                    )
+
+                    legends.add(tt)
+                    
+                
             counter.append(
                 (self.configs["regions"].loc[region, "region_name"], len(fig.data))
             )
+        
         layout = {
             "title": "Hourly production by technologies",
             "yaxis": {"title": unit},
+            "xaxis": dict(tickmode="array", tickvals=values.index, dtick=1),
         }
         if not aggregate:
             fig = set_steps(fig, counter, mode)
+        if kind == "bar":
+            layout["barmode"] = "relative"
         _plotter(fig=fig, layout=layout, path=path)
 
     def plot_regional_costs(
@@ -1239,12 +1438,12 @@ class Plotter:
         """
 
         cost_items = {
-            "fix_cost": {"name": "Fix Cost", "color": "red"},
-            "variable_cost": {"name": "Variable Cost", "color": "blue"},
-            "investment_cost": {"name": "Investment Cost", "color": "green"},
+            "cost_fix": {"name": "Fix Cost", "color": "red"},
+            "cost_variable": {"name": "Variable Cost", "color": "blue"},
+            "cost_inv": {"name": "Investment Cost", "color": "green"},
             "decommissioning_cost": {"name": "Decommissioning Cost", "color": "yellow"},
-            "fix_tax_cost": {"name": "Fix Tax Cost", "color": "brown"},
-            "fix_subsidies": {"name": "Fix subsidies", "color": "khaki"},
+            "cost_fix_tax": {"name": "Fix Tax Cost", "color": "brown"},
+            "cost_fix_sub": {"name": "Fix subsidies", "color": "khaki"},
         }
 
         techs = self.configs["techs"]
@@ -1263,18 +1462,34 @@ class Plotter:
         for step_index, region in enumerate(regions):
             if not aggregate:
                 legends = set()
-
+                
+            data=self.data._asdict()
+            
             for cost_item, info in cost_items.items():
-                if (cost_item not in self.data) or (cost_item in exclude_cost_items):
+                if (cost_item not in data.keys()) or (cost_item in exclude_cost_items):
                     continue
+                
+                tech_type_ = self.mapping[region]["Technologies"]["Tech_category"].to_list()
 
-                to_plot = pd.concat(list(self.data[cost_item][region].values()), axis=1)
-                if cost_item in ["fix_subsidies"]:
+                tech_type = []
+                for elem in tech_type_:
+                    if elem not in tech_type:
+                        tech_type.append(elem)
+                        
+                to_plot = pd.DataFrame()
+                for tt in tech_type:
+                    if tt == "Demand":
+                        continue
+                    columns = self.mapping[region]["Technologies"].loc[self.mapping[region]["Technologies"]["Tech_category"]==tt]["Technology"].to_list()
+                    df = pd.DataFrame(data[cost_item][region][tt].value,index = self.years, columns = columns)
+                    to_plot = pd.concat([to_plot,df], axis=1)
+                    
+                if cost_item in ["cost_fix_sub"]:
                     to_plot = -to_plot
 
                 if stacked_by == "techs":
 
-                    for t, values in to_plot.iteritems():
+                    for t, values in to_plot.items():
                         if t in exclude_techs:
                             continue
 
@@ -1297,7 +1512,7 @@ class Plotter:
                         legends.add(t)
 
                 elif stacked_by == "items":
-                    for t, values in to_plot.iteritems():
+                    for t, values in to_plot.items():
                         if t in exclude_techs:
                             continue
                         name = info["name"]

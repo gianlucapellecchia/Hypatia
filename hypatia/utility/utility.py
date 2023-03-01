@@ -128,6 +128,30 @@ def _calc_production_overall(
 
     return production_overall
 
+def _calc_carr_production_overall(
+        glob_carriers, regions, main_years, carriers, variable
+):
+    
+    """
+    Calculates the aggregated annual production of each carrier
+    over all the regions
+    """
+    
+    production_overall = {}
+    for carr in list(
+            glob_carriers["Carrier"]
+    ):
+        production_overall[carr] = np.zeros((len(main_years), 1))
+        for reg in regions:
+            for key in carriers[reg]["Carrier_output"]["Carrier_out"]:
+
+                if carr in key:
+
+                    production_overall[carr] += variable[reg][key]
+
+    return production_overall
+    
+
 
 def line_newcap_accumulated(line_newcap, carriers, main_years, line_tlft):
 
@@ -339,6 +363,7 @@ def annual_activity(activity, main_years, timeslices):
     """
     Calculates the annual production from the prodution defined on timeslices
     """
+    
     activity_annual = cp.sum(activity[0 : len(timeslices), :], axis=0, keepdims=True)
 
     for indx, year in enumerate(main_years[1:]):

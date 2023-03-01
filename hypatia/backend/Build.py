@@ -42,7 +42,10 @@ RESULTS = [
     "captured_emission_by_type",
     "used_emissions_by_type",
     "demand",
-    "storage_SOC"    
+    "storage_SOC",
+    "residual_capacity",
+    "carrier_ratio_in",
+    "carrier_ratio_out"
 ]
 
 PLANNING_RESULTS = [

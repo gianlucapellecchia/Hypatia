@@ -43,6 +43,19 @@ class ModelVariables():
         self.demand = {
             reg: self.model_data.regional_parameters[reg]["demand"] for reg in self.model_data.settings.regions
         }
+        
+        self.carrier_ratio_in = {}
+        for reg in self.model_data.settings.regions:
+            if "Conversion_plus" not in self.model_data.settings.technologies[reg].keys(): 
+                continue
+            self.carrier_ratio_in[reg] = self.model_data.regional_parameters[reg]["carrier_ratio_in"]
+            
+        self.carrier_ratio_out = {}
+        for reg in self.model_data.settings.regions:
+            if "Conversion_plus" not in self.model_data.settings.technologies[reg].keys(): 
+                continue
+            self.carrier_ratio_out[reg] = self.model_data.regional_parameters[reg]["carrier_ratio_out"]
+        
 
     """
     Primary variables
@@ -167,6 +180,8 @@ class ModelVariables():
         self.cost_decom = {}
         self.cost_variable = {}
         self.production_annual = {}
+        self.land_usage = {}
+        self.residual_capacity = {}
 
         for reg in self.model_data.settings.regions:
             
@@ -185,6 +200,8 @@ class ModelVariables():
             cost_decom_regional = {}
             cost_variable_regional = {}
             production_annual_regional = {}
+            land_usage_regional = {}
+            residual_capacity_regional = {}
 
             for key in self.new_capacity[reg].keys():
 
@@ -272,6 +289,12 @@ class ModelVariables():
                     self.model_data.settings.years,
                     self.model_data.regional_parameters[reg]["discount_rate"],
                 )  
+                
+                land_usage_regional[key] = cp.multiply(
+                    totalcapacity_regional[key],self.model_data.regional_parameters[reg]["specific_land_usage"].loc[:, key]
+                ) 
+                
+                residual_capacity_regional[key] = self.model_data.regional_parameters[reg]["tech_residual_cap"].loc[:, key]
 
             self.real_new_capacity[reg] = real_new_capacity_regional
             self.cost_inv[reg] = cost_inv_regional
@@ -287,6 +310,8 @@ class ModelVariables():
             self.cost_variable[reg] = cost_variable_regional
             self.cost_inv_fvalue[reg] = cost_fvalue_regional
             self.production_annual[reg] = production_annual_regional
+            self.land_usage[reg] = land_usage_regional
+            self.residual_capacity[reg] = residual_capacity_regional
 
     def _calc_variable_planning_line(self):
 
@@ -367,6 +392,8 @@ class ModelVariables():
         self.cost_fix_sub = {}
         self.cost_variable = {}
         self.production_annual = {}
+        self.residual_capacity = {}
+        
         for reg in self.model_data.settings.regions:
 
             totalcapacity_regional = {}
@@ -375,6 +402,7 @@ class ModelVariables():
             cost_fix_Sub_regional = {}
             cost_variable_regional = {}
             production_annual_regional = {}
+            residual_capacity_regional = {}            
 
             for key in self.model_data.settings.technologies[reg].keys():
 
@@ -405,6 +433,8 @@ class ModelVariables():
                         production_annual_regional[key],
                         self.model_data.regional_parameters[reg]["tech_var_cost"].loc[:, key],
                     )
+                    
+                    residual_capacity_regional[key] = self.model_data.regional_parameters[reg]["tech_residual_cap"].loc[:, key]
 
             self.totalcapacity[reg] = totalcapacity_regional
             self.cost_fix[reg] = cost_fix_regional
@@ -412,6 +442,7 @@ class ModelVariables():
             self.cost_fix_sub[reg] = cost_fix_Sub_regional
             self.cost_variable[reg] = cost_variable_regional
             self.production_annual[reg] = production_annual_regional
+            self.residual_capacity[reg] = residual_capacity_regional
         
 
     def _calc_variable_operation_line(self):

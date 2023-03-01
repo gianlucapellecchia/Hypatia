@@ -14,7 +14,7 @@ class TotalCapacityRegional(Constraint):
     MODES = [ModelMode.Planning]
 
     def _check(self):
-        assert hasattr(self.variables, 'totalcapacity'), "totalprodbycarrier must be defined"
+        assert hasattr(self.variables, 'totalcapacity'), "totalcapacity must be defined"
 
     def rules(self):
         rules = []
