@@ -37,7 +37,6 @@ class AnnualProductionRegional(Constraint):
 
                     prodbycarrier_annual.append(totalprodbycarrier_annual_rest)
 
-
                 totalprodbycarrier_annual = cp.vstack(prodbycarrier_annual)
                     
                 for key in self.model_data.settings.technologies[reg].keys():

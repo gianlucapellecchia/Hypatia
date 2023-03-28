@@ -301,6 +301,12 @@ class ModelSettings:
                 "index": pd.Index(self.years, name="Years"),
                 "columns": indexer,
             },
+            "line_length": {
+                "sheet_name": "Line_length",
+                "value": 100,
+                "index": pd.Index(self.years, name="Years"),
+                "columns": indexer,
+            },
         }
 
         if self.mode == ModelMode.Planning:
@@ -436,6 +442,12 @@ class ModelSettings:
                     "value": 0, # cp.Parameter(), #(len(self.years), len(specific_emission_indexer)),value = np.zeros((len(self.years), len(specific_emission_indexer)))), #shape=(len(self.years), len(specific_emission_indexer.columns)),
                     "index": pd.Index(self.years, name="Years"),
                     "columns": specific_emission_indexer,
+                },
+                "specific_land_usage": {
+                    "sheet_name": "Specific_land_usage",
+                    "value": 0,
+                    "index": pd.Index(self.years, name="Years"),
+                    "columns": indexer_reg,
                 },
                 "emission_filter_efficiency": {
                     "sheet_name": "Emission_filter_efficiency",
