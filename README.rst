@@ -59,17 +59,25 @@ After activating the environment, you need to install **CVXPY, version 1.1.18**:
 
     conda install -c conda-forge cvxpy=1.1.18 
 
-Then, you can use *pip* to install hypatia as follow:
+Then, you can download the code version you are interesting in and save in any folder of your local disk, after unzipping it. After that, open the *Anaconda Prompt*, activate the enviroment of hypatia and digit: 
 
 .. code-block:: bash
 
-    pip install hypatia-py
+    cd "path"
     
-If you already installed the package and just need to upgrade it to lastet version, you need to use the following command after activating the environment:
+"path" of local folder in which you placed the calliope folder you just downloaded e.g. C:\Users\YourUser\GitHub\Hypatia. 
+Inside the path digit:
 
 .. code-block:: bash
 
-    pip install --upgrade hypatia-py
+    python setup.py bdist_wheel
+
+FInally, the last command:
+
+.. code-block:: bash
+
+    pip install -e .
+
 
 Most of the open source solvers that are supported by CVXPY (the optimization library used in Hypatia), will be installed
 automatically with the software. For the commercial solvers, you should follow the specific installation methods. 
